@@ -44,31 +44,21 @@ def main():
             # Scrape
             df = scrape_po_receive(context, start_id, end_id)
             
-            # Save results to MotherDuck
+            # Format data types and align columns with the database schema
             if not df.empty:
-                import duckdb
                 import pandas as pd
-                print("Connecting to MotherDuck...")
-                con = duckdb.connect("md:lake")
                 
-                # Format data types and align columns with the database schema:
-                # ID BIGINT, ReqNumber VARCHAR, PONumber VARCHAR, ReceiveBy VARCHAR, ItemName VARCHAR, Unit VARCHAR, Quantity VARCHAR, ReceiveDate DATE
                 df['ID'] = df['ID'].astype(int)
                 df['Quantity'] = df['Quantity'].astype(str)
                 df['ReceiveDate'] = pd.to_datetime(df['ReceiveDate'], errors='coerce').dt.date
                 df = df[['ID', 'ReqNumber', 'PONumber', 'ReceiveBy', 'ItemName', 'Unit', 'Quantity', 'ReceiveDate']]
                 
-                # Delete existing IDs to avoid duplication (replace on conflict)
-                unique_ids = df["ID"].unique().tolist()
-                if unique_ids:
-                    if len(unique_ids) == 1:
-                        con.execute(f"DELETE FROM po_receive_data WHERE ID = {unique_ids[0]}")
-                    else:
-                        con.execute(f"DELETE FROM po_receive_data WHERE ID IN {tuple(unique_ids)}")
-                
-                # Insert data
-                con.execute("INSERT INTO po_receive_data SELECT * FROM df")
-                print("SUCCESS: Data successfully saved to MotherDuck table 'po_receive_data'")
+                # Save results to a local Parquet file
+                output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+                os.makedirs(output_dir, exist_ok=True)
+                parquet_path = os.path.join(output_dir, 'po_receive_raw.parquet')
+                df.to_parquet(parquet_path, index=False)
+                print(f"SUCCESS: Raw data saved to local Parquet: {parquet_path}")
             else:
                 print("WARNING: No data was scraped (empty DataFrame).")
                 
