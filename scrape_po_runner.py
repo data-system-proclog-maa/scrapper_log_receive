@@ -24,12 +24,12 @@ def main():
     # Default start is 30340.
     # Default end is 36250 on the week starting Monday, June 29, 2026.
     # It increases by 300 each subsequent week (Monday).
-    ref_date = datetime.date(2026, 6, 29) # Reference Monday
+    ref_date = datetime.date(2026, 1, 5) # Reference Monday
     current_date = datetime.date.today()
     weeks_elapsed = max(0, (current_date - ref_date).days // 7)
 
     start_id = args.start if args.start is not None else 30340
-    end_id = args.end if args.end is not None else (36250 + (weeks_elapsed * 300))
+    end_id = args.end if args.end is not None else (30340 + (weeks_elapsed * 300))
 
     print(f"Target scraping ID range: {start_id} to {end_id} (weeks elapsed since June 29, 2026: {weeks_elapsed})")
     with sync_playwright() as p:

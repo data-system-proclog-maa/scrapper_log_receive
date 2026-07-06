@@ -24,7 +24,7 @@ def main():
     # Default start is 7865.
     # Default end is 7865 on the week starting Monday, June 29, 2026.
     # It increases by 75 each subsequent week (Monday).
-    ref_date = datetime.date(2026, 6, 29) # Reference Monday
+    ref_date = datetime.date(2026, 1, 5) # Reference Monday
     current_date = datetime.date.today()
     weeks_elapsed = max(0, (current_date - ref_date).days // 7)
 
