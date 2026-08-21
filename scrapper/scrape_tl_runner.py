@@ -1,10 +1,12 @@
 import sys
 import os
 
-# Ensure current directory is in sys.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Ensure project root is in sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
-from receive_log import login_to_cps_mobile, scrape_tl_receive
+from function.receive_log import login_to_cps_mobile, scrape_tl_receive
 from playwright.sync_api import sync_playwright
 
 def main():
@@ -54,7 +56,7 @@ def main():
                 df = df[['ID', 'TransferNumber', 'ReceiveBy', 'ItemName', 'Unit', 'Quantity', 'ReceiveDate']]
                 
                 # Save results to a local Parquet file
-                output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+                output_dir = os.path.join(project_root, 'data')
                 os.makedirs(output_dir, exist_ok=True)
                 parquet_path = os.path.join(output_dir, 'tl_receive_raw.parquet')
                 df.to_parquet(parquet_path, index=False)

@@ -17,6 +17,26 @@ def login_to_cps_mobile(context: BrowserContext):
     page.wait_for_url(lambda url: "Login" not in url)
     print("logged in successfully.")
 
+def login_to_cps(context: BrowserContext):
+    page = context.new_page()
+    print("logging in to cps ...")
+    page.goto("https://maa-admin.onlinepo.com/CPS/Login.aspx")
+    page.wait_for_selector("#ASPxPanel2_txtUsername_I", timeout=15000)
+    page.fill("#ASPxPanel2_txtUsername_I", CPS_USERNAME)
+    page.fill("#ASPxPanel2_txtPassword_I", CPS_PASSWORD)
+    
+    # Click sign in button or press Enter
+    try:
+        page.click("#ASPxPanel2_btnSignIn", timeout=3000)
+    except Exception:
+        try:
+            page.click("text=Sign In", timeout=3000)
+        except Exception:
+            page.keyboard.press("Enter")
+        
+    page.wait_for_url(lambda url: "Login" not in url, timeout=20000)
+    print("logged in successfully.")
+
 def scrape_po_receive(context: BrowserContext, start_id: int, end_id: int) -> pd.DataFrame:
     print("start scraping PO Receive...")
     po_receive_url = "https://maa-m.onlinepo.com/POReceiveAttachment.aspx?mode=view&ID={}"
@@ -222,4 +242,114 @@ def scrape_inventory(context: BrowserContext, start_id: int, end_id: int) -> pd.
     df = pd.DataFrame(all_rows)
     print(f"Scraped {len(df)} rows for Inventory Handover.")
     return df
+
+
+def scrape_tr_entry(context: BrowserContext, start_id: int, end_id: int) -> pd.DataFrame:
+    print("start scraping TR Entry...")
+    tr_detail_url = "https://maa-admin.onlinepo.com/CPS/Forms/Project/BIZ_TransferDetail.aspx?ID={}"
+    all_rows = []
+    
+    # init a new page
+    page = context.new_page()
+    
+    for doc_id in range(start_id, end_id + 1):
+        print(f"processing TR Entry ID {doc_id}")
+        
+        # memory recycling: every 50 docs, kill the page and start fresh
+        if doc_id > start_id and doc_id % 50 == 0:
+            page.close()
+            page = context.new_page()
+
+        try:
+            page.goto(tr_detail_url.format(doc_id), wait_until="commit", timeout=15000)
+
+            # 1. Robust frame detection — find the frame that has txtTransferNumber_I
+            target_selector = "[id$='txtTransferNumber_I']"
+            frame = page
+            if not page.locator(target_selector).is_visible(timeout=3000):
+                for f in page.frames:
+                    if f.locator(target_selector).count() > 0:
+                        frame = f
+                        break
+            
+            if frame.locator(target_selector).count() == 0:
+                print(f"  Transfer number not found for ID {doc_id}, skipping.")
+                continue
+
+            # 2. Get Transfer Number from header
+            transfer_number = frame.locator("[id$='txtTransferNumber_I']").input_value().strip()
+            
+            # 3. Click the "Transfer Items" tab — use .first to avoid strict mode violation
+            tab_link = frame.locator("a[id$='_PCMain_T1T']").first
+            tab_link.click()
+            page.wait_for_timeout(1500)
+            
+            # 4. Find dgEntryList — the DevExpress grid inside cpTransferEntry
+            #    It is rendered on page load; the tab click just makes the panel visible
+            grid = frame.locator("[id$='dgEntryList']")
+            if grid.count() == 0:
+                # Broader fallback: any dxgvTable in the frame
+                grid = frame.locator("table.dxgvTable")
+                
+            if grid.count() == 0:
+                print(f"  No grid found for ID {doc_id}")
+                continue
+
+            grid = grid.first
+
+            # 5. Extract data rows — each row is a tr containing td.dxgv cells
+            data_rows = grid.locator("tr:has(td.dxgv)").all()
+            if not data_rows:
+                data_rows = grid.locator("tr").all()[1:]
+
+            for row in data_rows:
+                cells = row.locator("td.dxgv").all()
+                if len(cells) < 2:
+                    continue
+
+                def cell_text(idx):
+                    if idx >= len(cells):
+                        return ""
+                    return cells[idx].inner_text().strip()
+
+                # Item Description: search row for element ending in lblItemDescription
+                item_desc = ""
+                lbl = row.locator("[id$='lblItemDescription']")
+                if lbl.count() > 0:
+                    item_desc = lbl.first.inner_text().strip()
+                else:
+                    item_desc = cell_text(2)
+
+                # Additional Item: checkbox — search row for any checkbox element
+                additional_item = False
+                cb_span = row.locator("span.dxICheckBox, span[class*='CheckBox']")
+                if cb_span.count() > 0:
+                    cb_class = cb_span.first.get_attribute("class") or ""
+                    additional_item = "dxWeb_edtCheckBoxChecked" in cb_class or ("Checked" in cb_class and "Unchecked" not in cb_class)
+
+                all_rows.append({
+                    "ID": doc_id,
+                    "TransferNumber": transfer_number,
+                    "Department":       cell_text(0),
+                    "PO Number":        cell_text(1),
+                    "Item Description": item_desc,
+                    "ETA":              cell_text(3),
+                    "Qty Shipped":      cell_text(4),
+                    "Qty Received":     cell_text(5),
+                    "Additional Item":  additional_item,
+                })
+
+            print(f"  Found {len(data_rows)} entry rows for ID {doc_id}")
+
+        except Exception as e:
+            print(f"Error processing ID {doc_id}: {e}")
+            continue
+
+    page.close()
+    
+    df = pd.DataFrame(all_rows)
+    print(f"Scraped {len(df)} rows for TR Entry.")
+    return df
+
+
 

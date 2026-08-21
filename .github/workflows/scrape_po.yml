@@ -36,4 +36,4 @@ jobs:
           CPS_USERNAME: ${{ secrets.CPS_USERNAME }}
           CPS_PASSWORD: ${{ secrets.CPS_PASSWORD }}
           MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-        run: python scrape_po_runner.py
+        run: python scrapper/scrape_po_runner.py

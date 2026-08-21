@@ -1,15 +1,20 @@
 import os
 import duckdb
 import pandas as pd
+from dotenv import load_dotenv
+
+# Load environment variables (MOTHERDUCK_TOKEN)
+load_dotenv()
 
 def main():
     print("==========================================")
-    print("      TL Receive MotherDuck Loader        ")
+    print("      PO Receive MotherDuck Loader        ")
     print("==========================================")
 
     # Path to the Parquet file
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    parquet_path = os.path.join(script_dir, 'data', 'tl_receive_raw.parquet')
+    project_root = os.path.dirname(script_dir)
+    parquet_path = os.path.join(project_root, 'data', 'po_receive_raw.parquet')
 
     if not os.path.exists(parquet_path):
         print(f"WARNING: Parquet file not found at {parquet_path}. Nothing to load.")
@@ -28,20 +33,20 @@ def main():
     df['ID'] = df['ID'].astype(int)
     df['Quantity'] = df['Quantity'].astype(str)
     df['ReceiveDate'] = pd.to_datetime(df['ReceiveDate'], errors='coerce').dt.date
-    df = df[['ID', 'TransferNumber', 'ReceiveBy', 'ItemName', 'Unit', 'Quantity', 'ReceiveDate']]
+    df = df[['ID', 'ReqNumber', 'PONumber', 'ReceiveBy', 'ItemName', 'Unit', 'Quantity', 'ReceiveDate']]
 
     # Delete existing IDs to avoid duplication
     unique_ids = df["ID"].unique().tolist()
     if unique_ids:
         print(f"Found {len(unique_ids)} unique IDs to load. Running deduplication...")
         if len(unique_ids) == 1:
-            con.execute(f"DELETE FROM tl_receive_data WHERE ID = {unique_ids[0]}")
+            con.execute(f"DELETE FROM po_receive_data WHERE ID = {unique_ids[0]}")
         else:
-            con.execute(f"DELETE FROM tl_receive_data WHERE ID IN {tuple(unique_ids)}")
+            con.execute(f"DELETE FROM po_receive_data WHERE ID IN {tuple(unique_ids)}")
 
     # Insert data
-    print(f"Inserting {len(df)} rows into MotherDuck table 'tl_receive_data'...")
-    con.execute("INSERT INTO tl_receive_data SELECT * FROM df")
+    print(f"Inserting {len(df)} rows into MotherDuck table 'po_receive_data'...")
+    con.execute("INSERT INTO po_receive_data SELECT * FROM df")
     print("SUCCESS: Data successfully saved to MotherDuck!")
 
 if __name__ == "__main__":

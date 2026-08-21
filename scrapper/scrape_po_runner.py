@@ -1,10 +1,12 @@
 import sys
 import os
 
-# Ensure current directory is in sys.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Ensure project root is in sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
-from receive_log import login_to_cps_mobile, scrape_po_receive
+from function.receive_log import login_to_cps_mobile, scrape_po_receive
 from playwright.sync_api import sync_playwright
 
 def main():
@@ -24,12 +26,14 @@ def main():
     # Default start is 30340.
     # Default end is 36250 on the week starting Monday, June 29, 2026.
     # It increases by 300 each subsequent week (Monday).
-    ref_date = datetime.date(2026, 1, 5) # Reference Monday
+    ref_date = datetime.date(2026, 2, 1) # Reference Monday
     current_date = datetime.date.today()
     weeks_elapsed = max(0, (current_date - ref_date).days // 7)
+    start_id = 35000
+    end_id = 37426
 
-    start_id = args.start if args.start is not None else 30340
-    end_id = args.end if args.end is not None else (30340 + (weeks_elapsed * 300))
+    #start_id = args.start if args.start is not None else 31400
+    #end_id = args.end if args.end is not None else (31400 + (weeks_elapsed * 290))
 
     print(f"Target scraping ID range: {start_id} to {end_id} (weeks elapsed since June 29, 2026: {weeks_elapsed})")
     with sync_playwright() as p:
@@ -54,7 +58,7 @@ def main():
                 df = df[['ID', 'ReqNumber', 'PONumber', 'ReceiveBy', 'ItemName', 'Unit', 'Quantity', 'ReceiveDate']]
                 
                 # Save results to a local Parquet file
-                output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+                output_dir = os.path.join(project_root, 'data')
                 os.makedirs(output_dir, exist_ok=True)
                 parquet_path = os.path.join(output_dir, 'po_receive_raw.parquet')
                 df.to_parquet(parquet_path, index=False)
