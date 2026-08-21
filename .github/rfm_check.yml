@@ -1,0 +1,38 @@
+name: rfm_category_check
+
+on:
+  workflow_dispatch: # Allows manual trigger
+    inputs:
+      manual_reason:
+        description: 'Reason for running manually'
+        required: false
+        default: 'Manual test'
+
+permissions:
+  contents: write
+
+jobs:
+  scrape_job:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas playwright python-dotenv duckdb
+
+      - name: Run Scraper
+        env:
+          CPS_USERNAME: ${{ secrets.CPS_USERNAME }}
+          CPS_PASSWORD: ${{ secrets.CPS_PASSWORD }}
+          MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+        run: processor_system/category_check.py
